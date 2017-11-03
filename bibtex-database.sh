@@ -4,10 +4,23 @@
 # BibTex-database generator
 ###################################################################
 
+###################################################################
+# Function and parameters needed for the main script
+
+#function to create neat BibTex output
+function tidyUp {
+	printf "$( echo "$1" | sed 's/}, /},\\n/g' | sed 's/}}/}}\\n/g' | sed 's/ @/@/g' | sed 's/\={/ \= {/g' | sed 's/}}/}}\\n/g' )"
+}
+
+
 #set color parameter in order to have readable ouput separation
 #RED is use for the word not to indicate a DOI url did not generated a Bibtex entry
 RED=$( tput setaf 196 )
 RESET=$( tput sgr0 )
+
+
+###################################################################
+# Main script
 
 #check if user supplied arguments or and whether stdIn is not given
 #and if file is not present in the directory
@@ -26,11 +39,18 @@ if [ $# -eq 1 ] && [ -t 0 ]; then
 	if [[ $bibtex == ?@* ]]; then
 		
 		#Check whether supplied file arguments already exists
-		if [ ! -f $1 ]; then			
-			echo "$bibtex" >> $1 
+		if [ ! -f $1 ]; then
+			tidyUp "$bibtex" >> $1 
 			echo "$doi has been added to new BibTex database named $1"
 		else
-			echo "$bibtex" >> $1
+			
+			#check whether the doi is already in the database
+			isAlreadyPresent=$( cat "$1" | grep "$doi" | wc -l )
+			if [ $isAlreadyPresent -gt 1 ]; then
+				printf "$doi is $RED%salready$RESET in the database\n" ; exit ; 
+			fi
+
+			tidyUp "$bibtex" >> $1 
 			echo "$doi has been added to $1"
 		fi
 	else
@@ -64,9 +84,14 @@ elif [ $# -eq 1 ] && [ ! -t 0 ]; then
 		
 		bibtex=$( curl -k -s -LH "Accept: text/bibliography; style=bibtex" https://doi.org/$doi )
 		
-		if [[ $bibtex == ?@* ]]; then
-			echo "$bibtex" >> $1 
+		#check whether doi is already in the database			
+		isAlreadyPresent=$( cat "$1" | grep "$doi" | wc -l )
+
+		if [[ $bibtex == ?@* ]] && [ $isAlreadyPresent -eq 1 ]; then
+			tidyUp "$bibtex" >> $1 
 			echo "$doi has been added to $1$databaseStatus"
+		elif [[ $bibtex == ?@* ]] && [ $isAlreadyPresent -gt 1 ]; then
+			printf "$doi is $RED%salready$RESET in the database\n" 
 		else
 			printf "$doi on line $counter did $RED%snot$RESET generate a BibTex entry\n"
 		fi
